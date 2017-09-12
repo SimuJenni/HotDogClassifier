@@ -1,8 +1,12 @@
 from keras.preprocessing.image import ImageDataGenerator
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Activation, Dropout, Flatten, Dense
+from keras.utils import plot_model
 import matplotlib.pyplot as plt
+import numpy as np
+from utils import count_images, test_on_image
+
 
 """
     Prepare the data for training and testing
@@ -10,10 +14,12 @@ import matplotlib.pyplot as plt
 
 train_dir = '../seefood/train'
 test_dir = '../seefood/test'
+model_path = 'first_try.h5'
 
 batch_size = 16
 target_size = (64, 64)
-classes = ['hot_dog', 'pizza']
+classes = ['hot_dog', 'pizza', 'french_fries', 'hamburger']
+# classes = None    # This will use all the classes!
 
 # This data-generator performs different forms of augmentation
 train_datagen = ImageDataGenerator(
@@ -32,14 +38,14 @@ train_generator = train_datagen.flow_from_directory(
     target_size=target_size,  # images will be resized
     batch_size=batch_size,
     classes=classes,  # the classes used for training
-    class_mode='binary')  # since we use binary_crossentropy loss, we need binary labels
+    class_mode='categorical')  # since we use binary_crossentropy loss, we need binary labels
 
 validation_generator = test_datagen.flow_from_directory(
     test_dir,
     target_size=target_size,
     batch_size=batch_size,
     classes=classes,
-    class_mode='binary')
+    class_mode='categorical')
 
 """
     Build the neural network
@@ -57,12 +63,15 @@ model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
 model.add(Dense(units=64))
 model.add(Activation('relu'))
 model.add(Dropout(rate=0.5))
-model.add(Dense(units=1))
-model.add(Activation('sigmoid'))
+model.add(Dense(units=len(classes)))
+model.add(Activation('softmax'))
 
-model.compile(loss='binary_crossentropy',
+model.compile(loss='categorical_crossentropy',
               optimizer='sgd',
               metrics=['accuracy'])
+
+plot_model(model, to_file='model.png', show_shapes=True)
+
 
 """
     Training the network
@@ -70,13 +79,13 @@ model.compile(loss='binary_crossentropy',
 
 history = model.fit_generator(
     train_generator,
-    steps_per_epoch=2000 // batch_size,
-    epochs=30,
+    steps_per_epoch=count_images(train_dir, classes) // batch_size,
+    epochs=10,
     validation_data=validation_generator,
-    validation_steps=800 // batch_size,
+    validation_steps=count_images(test_dir, classes) // batch_size,
     workers=4,
     use_multiprocessing=True)
-model.save_weights('first_try.h5')  # always save your weights after training or during training
+model.save(model_path)  # always save your weights after training or during training
 
 """
     Visualize training
@@ -114,13 +123,22 @@ test_x, test_y = test_datagen.flow_from_directory(test_dir,
                                                   target_size=target_size,
                                                   batch_size=16,
                                                   classes=classes,
-                                                  class_mode='binary').next()
+                                                  class_mode='categorical').next()
 pred = model.predict(test_x, batch_size=16)
+pred_idx = np.argmax(pred, axis=1)
+
 nx, ny = (2, 8)
 f, axarr = plt.subplots(2, 8, figsize=(20, 5))
 for x in range(nx):
     for y in range(ny):
         idx = x * ny + y
         axarr[x, y].imshow(test_x[idx])
-        axarr[x, y].set_title('Pred: {}'.format(pred[idx]))
+        axarr[x, y].set_title('Predicted class: {}'.format(classes[pred_idx[idx]]))
 plt.show()
+
+
+"""
+    Test on a single image
+"""
+model = load_model(model_path)
+test_on_image(model, 'hotdog.jpg', target_size, classes)

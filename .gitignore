@@ -102,3 +102,5 @@ ENV/
 
 # My additions
 .idea
+*.h5
+*.png
