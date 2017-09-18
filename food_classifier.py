@@ -16,18 +16,18 @@ train_dir = '../seefood/train'
 test_dir = '../seefood/test'
 model_path = 'first_try.h5'
 
-batch_size = 16
-target_size = (64, 64)
+batch_size = 128
+target_size = (96, 96)
 classes = ['hot_dog', 'pizza', 'french_fries', 'hamburger']
 # classes = None    # This will use all the classes!
 
 # This data-generator performs different forms of augmentation
 train_datagen = ImageDataGenerator(
     rescale=1. / 255,
-    shear_range=0.,
-    zoom_range=0.,
-    rotation_range=0.,
-    horizontal_flip=False)
+    shear_range=0.5,
+    zoom_range=0.5,
+    rotation_range=15,
+    horizontal_flip=True)
 
 # Only rescale the images for testing
 test_datagen = ImageDataGenerator(rescale=1. / 255)
@@ -54,13 +54,29 @@ validation_generator = test_datagen.flow_from_directory(
 model = Sequential()
 
 # Convolution layers (typically conv2d -> activation -> pooling
-model.add(Conv2D(filters=32, kernel_size=(3, 3), input_shape=target_size + (3,)))  # input_shape only for 1st layer
+model.add(Conv2D(filters=64, kernel_size=(3, 3), input_shape=target_size + (3,)))  # input_shape only for 1st layer
 model.add(Activation('relu'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
 
+model.add(Conv2D(filters=128, kernel_size=(3, 3)))    # input_shape only for 1st layer
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Conv2D(filters=256, kernel_size=(3, 3)))    # input_shape only for 1st layer
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Conv2D(filters=512, kernel_size=(3, 3)))    # input_shape only for 1st layer
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+
 # Fully-connected layers
 model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-model.add(Dense(units=64))
+model.add(Dense(units=2048))
+model.add(Activation('relu'))
+model.add(Dropout(rate=0.5))
+model.add(Dense(units=1024))
 model.add(Activation('relu'))
 model.add(Dropout(rate=0.5))
 model.add(Dense(units=len(classes)))
@@ -80,7 +96,7 @@ plot_model(model, to_file='model.png', show_shapes=True)
 history = model.fit_generator(
     train_generator,
     steps_per_epoch=count_images(train_dir, classes) // batch_size,
-    epochs=10,
+    epochs=200,
     validation_data=validation_generator,
     validation_steps=count_images(test_dir, classes) // batch_size,
     workers=4,
